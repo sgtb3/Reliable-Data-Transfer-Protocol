@@ -49,9 +49,8 @@ public class RDT_Sender extends RDT_Protocol {
             while (true) {
 
                 /* break if final data segment acknowledged */
-                if (final_seg.acked) {
+                if (final_seg.acked)
                     break;
-                }
 
                 /* for concurrency issues, save current sequence number */
                 curr_seq_num = next_seq_num;
@@ -381,7 +380,7 @@ public class RDT_Sender extends RDT_Protocol {
             if (opt != 6 && padding_bytes != 0)
                 payload.set_options(payload.int_to_bytes(padding_bytes));
         }
-        
+
         if (opt == 7)
             payload.set_RST(true);
 
