@@ -1,8 +1,5 @@
 import java.util.ArrayList;
 
-/**
- * A class to hold data segment information.
- */
 public class Segment {
 
     private byte[] data;
@@ -18,6 +15,12 @@ public class Segment {
     long time_sent;
     long time_acked;
 
+    /**
+     * Constructs a new Segment.
+     *
+     * @param seg_num: The segment number.
+     * @param seq_num: The associated packet sequence number.
+     */
     public Segment(int seg_num, int seq_num) {
         this.seg_num = seg_num;
         this.seq_num = seq_num;
@@ -30,6 +33,10 @@ public class Segment {
         retrans = false;
     }
 
+    /**
+     * Sets the segment data.
+     * @param : The non-empty and non-null data.
+     */
     public void set_data(byte[] data) {
         this.data = data;
         if (data != null && data.length != 0) {
@@ -59,12 +66,15 @@ public class Segment {
                 "\n}\n";
     }
 
+    /* Tester */
     public static void main(String[] args) {
+
         ArrayList<Segment> list = new ArrayList<>();
         int MSS = 576;
-        for (int i = 0; i < 10; i++) {
+
+        for (int i = 0; i < 10; i++)
             list.add(new Segment(i, (i * MSS)));
-        }
+
         list.forEach(System.out::println);
     }
 }

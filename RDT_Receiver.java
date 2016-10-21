@@ -18,6 +18,7 @@ public class RDT_Receiver extends RDT_Protocol {
 
     /**
      * Constructs a new Receiver.
+     * 
      * @param args  : The CL args.
      * @param debug : True - for debugging mode.
      *              : False - otherwise
@@ -36,14 +37,14 @@ public class RDT_Receiver extends RDT_Protocol {
          * Constructs a new Data_Handler.
          */
         public Data_Handler() {
+
             received = new CopyOnWriteArrayList<>();
             try {
                 file_writer = new FileOutputStream(data_file);
             } catch (FileNotFoundException e) {
                 kill("ERROR: Failed to create data file: " + e.getCause());
-                if (debug_mode) {
+                if (debug_mode)
                     e.printStackTrace();
-                }
             }
             last_ack_sent = 0;
             remote_fsn = -1;
@@ -59,56 +60,57 @@ public class RDT_Receiver extends RDT_Protocol {
             int exp_seq_num;
             byte[] data;
 
-            while (true)
-            {
-                // break if final ACK has been sent
-                if (last_ack_sent == remote_fsn) {
-                    break;
-                }
-                // receive the packet
-                payload = receive_packet(MSS);
-                if (payload == null) {
-                    continue;
-                }
+            while (true) {
 
-                // for concurrency, save the next expected seq num
+                /* break if final ACK has been sent */
+                if (last_ack_sent == remote_fsn)
+                    break;
+                
+                /* receive the packet */
+                payload = receive_packet(MSS);
+                if (payload == null)
+                    continue;
+
+                /* for concurrency, save the next expected seq num */
                 exp_seq_num = next_seq_num;
 
-                // extract data and seq_num from received payload
+                /* extract data and seq_num from received payload */
                 curr_seq_num = payload.get_seq_num();
                 data = payload.get_data();
 
-                // check for out-of-order/duplicate packets
+                /* check for out-of-order/duplicate packets */
                 if (curr_seq_num != exp_seq_num) {
                     String msg = "  : <-- seq# " + curr_seq_num;
                     if (received.contains(curr_seq_num)) {
                         duplicates++;
                         msg += " (Duplicate)";
                     }
-                    println(TAG.RECV + msg + " (Out-of-order) (expecting " + exp_seq_num + ")");
+                    println(TAG.RECV + msg + " (Out-of-order) (expecting " + 
+                    		exp_seq_num + ")");
                     ack_queue.offer(exp_seq_num);
                     continue;
                 }
 
-                // if final data packet
+                /* if final data packet */
                 if (payload.get_FIN()) {
 
                     println(TAG.RECV + "  : (FINAL) <-- seq# " + curr_seq_num);
 
-                    // get the size of the actual data
-                    int data_size = (payload.get_segment().length - DEFAULT_TCP_HEAD) -
-                                     payload.bytes_to_int(payload.get_options());
+                    /* get the size of the actual data */
+                    int data_size = (payload.get_segment().length - 
+                    				 DEFAULT_TCP_HEAD) - payload.
+                    				 bytes_to_int(payload.get_options());
 
                     bytes_trans += data_size;
                     FIN_recv = true;
 
-                    // write data to file
+                    /* write data to file */
                     try {
                         file_writer.write(data, 0, data_size);
                         file_writer.close();
                     } catch (IOException | NullPointerException ignored) {}
 
-                    // save the final sequence number
+                    /* save the final sequence number */
                     remote_fsn = (curr_seq_num + payload.get_segment().length) -
                                   DEFAULT_TCP_HEAD;
                     next_seq_num = remote_fsn;
@@ -119,7 +121,7 @@ public class RDT_Receiver extends RDT_Protocol {
 
                     println(TAG.RECV + "  : <-- seq# " + curr_seq_num);
 
-                    // if segment contains data, write data to file
+                    /* if segment contains data, write data to file */
                     if (data.length != 0) {
                         bytes_trans += data.length;
                         try {
@@ -127,29 +129,26 @@ public class RDT_Receiver extends RDT_Protocol {
                         } catch (IOException | NullPointerException ignored ) {}
                     }
 
-                    // update next expected seq num
+                    /* update next expected seq num */
                     next_seq_num = curr_seq_num + data.length;
 
-                    // stop timer for valid packet
-                    if (timer.running && (timer.seq_num <= curr_seq_num)) {
+                    /* stop timer for valid packet */
+                    if (timer.running && (timer.seq_num <= curr_seq_num))
                         timer.stop_timer(curr_seq_num);
-                    }
 
-                    // start timer for the next seq num if it's not running
-                    if (!timer.running) {
+                    /* start timer for the next seq num if it's not running */
+                    if (!timer.running)
                         timer.start_timer(next_seq_num);
-                    }
                 }
 
-                // log packet to file
+                /* log packet to file */
                 log(payload);
 
-                // add to list of received segments
-                if (!received.contains(curr_seq_num)) {
+                /* add to list of received segments */
+                if (!received.contains(curr_seq_num))
                     received.add(curr_seq_num);
-                }
 
-                // send the next expected seq num to queue for reply
+                /* send the next expected seq num to queue for reply */
                 ack_queue.offer(next_seq_num);
             }
             println(TAG.RECV + "  : Data_Handler complete.");
@@ -157,12 +156,12 @@ public class RDT_Receiver extends RDT_Protocol {
     }
 
     /**
-     * Handles the Receiver's outgoing actions (sending acknowledgements)
+     * Handles the Receiver's outgoing actions (sending acknowledgements).
      */
     private class ACK_Handler extends Thread {
 
         /**
-         * Constructor.
+         * Constructs a new ACK_Handler object.
          */
         public ACK_Handler() {
             ack_queue = new ConcurrentLinkedDeque<>();
@@ -173,11 +172,12 @@ public class RDT_Receiver extends RDT_Protocol {
          * Handles the dequeue portion. If more than one ACK is in the queue,
          * it chooses the one with the highest number and removes the
          * affected ACKs from the queue.
+         * 
          * @return : The next appropriate ACK to be sent.
          */
         private int dequeue_ack() {
 
-            // for concurrency, save queue in its present state
+            /* for concurrency, save queue in its present state */
             Object[] curr_queue = ack_queue.toArray();
             int queue_size = curr_queue.length;
 
@@ -188,11 +188,10 @@ public class RDT_Receiver extends RDT_Protocol {
                 return (int) curr_queue[0];
             }
 
-            // otherwise queue contains > 1 ACK
+            /* otherwise queue contains > 1 ACK */
             receiver_seq_num += queue_size;
-            for (Object ack : curr_queue) {
+            for (Object ack : curr_queue)
                 ack_queue.removeFirstOccurrence(ack);
-            }
 
             println(TAG.SEND + "  : --> Cumulative (ack#'s " + curr_queue[0] +
                     " - " + curr_queue[queue_size-1] + ")\n");
@@ -212,15 +211,14 @@ public class RDT_Receiver extends RDT_Protocol {
             byte[] buff = new byte[0];
             int overflow_count = 0;
 
-            while (true)
-            {
-                if (ack_queue.size() == 0) {
+            while (true) {
+
+                if (ack_queue.size() == 0)
                     continue;
-                }
 
                 payload.set_seq_num(receiver_seq_num);
 
-                // check for timeout
+                /* check for timeout */
                 if (timer.timeout_event) {
                     println(TAG.SEND + "  : Detected timeout_event." +
                             " Resending last sent ACK# --> " + last_ack_sent);
@@ -229,38 +227,36 @@ public class RDT_Receiver extends RDT_Protocol {
                     payload.set_ack_num(dequeue_ack());
                 }
 
-                // encode the payload
+                /* encode the payload */
                 try {
                     buff = payload.encode();
                 } catch (Exception e) {
                     kill("ERROR: Failed to encode ACK: " + e.getCause());
                 }
 
-                // send the packet
-                if (send_packet(buff))
-                {
-                    // prevent overflow attack
-                    if ((last_ack_sent == payload.get_ack_num()) &&
-                        (++overflow_count >= MAX_OVERFLOW)) {
-                        kill("ERROR: Network error - Packet overflow.");
-                    }
+                /* send the packet */
+                if (send_packet(buff)) {
 
-                    // update fields
+                    /* prevent overflow attack */
+                    if ((last_ack_sent == payload.get_ack_num()) &&
+                        (++overflow_count >= MAX_OVERFLOW))
+                        kill("ERROR: Network error - Packet overflow.");
+
+                    /* update fields */
                     last_ack_sent = payload.get_ack_num();
                     acks_sent++;
 
-                    // start the timer if it's not running
-                    if (!timer.running) {
+                    /* start the timer if it's not running */
+                    if (!timer.running)
                         timer.start_timer(last_ack_sent);
-                    }
 
-                    // break if final ACK has been sent
+                    /* break if final ACK has been sent */
                     if (FIN_recv && (remote_fsn >= 0) &&
-                       (last_ack_sent >= remote_fsn)) {
+                       (last_ack_sent >= remote_fsn))
                         break;
-                    }
                 }
             }
+
             println(TAG.SEND + "  : ACK_Handler complete.");
         }
     }
@@ -271,6 +267,7 @@ public class RDT_Receiver extends RDT_Protocol {
      *            : 2 - create SYN/ACK packet.
      *            : 3 - create FIN/ACK packet.
      *            : 4 - create FIN packet.
+     *            
      * @return    : TCP_Packet encoded as an array of bytes.
      */
     private byte[] make_packet(int opt, int seq_num, int ack_num) {
@@ -279,26 +276,26 @@ public class RDT_Receiver extends RDT_Protocol {
         payload.set_src_port(listen_sock.getLocalPort());
         payload.set_dest_port(remote_port);
 
-        // set flags
+        /* set flags */
         if (opt == 1 || opt == 2 || opt == 3) {
             payload.set_ACK(true);
             payload.set_ack_num(ack_num);
         }
+
         if (opt == 2 || opt == 3 || opt == 4) {
             payload.set_seq_num(seq_num);
-            if (opt == 2) {
+            if (opt == 2)
                 payload.set_SYN(true);
-            } else {
+            else
                 payload.set_FIN(true);
-            }
         }
-        // encode and return
+
+        /* encode and return */
         try {
             return payload.encode();
         } catch (Exception e) {
-            if (debug_mode) {
+            if (debug_mode)
                 e.printStackTrace();
-            }
             return null;
         }
     }
@@ -325,9 +322,8 @@ public class RDT_Receiver extends RDT_Protocol {
             ah.join();
         } catch (InterruptedException e) {
             kill("ERROR: Unable to complete file transfer!");
-            if (debug_mode) {
+            if (debug_mode)
                 e.printStackTrace();
-            }
         }
     }
 
@@ -337,7 +333,7 @@ public class RDT_Receiver extends RDT_Protocol {
         TCP_Packet payload;
         byte[] buff;
 
-        // receive SYN
+        /* receive SYN */
         while (true) {
             payload = receive_packet(DEFAULT_TCP_HEAD);
             if (payload != null && payload.get_SYN()) {
@@ -348,13 +344,12 @@ public class RDT_Receiver extends RDT_Protocol {
             }
         }
 
-        // make SYN/ACK
+        /* make SYN/ACK */
         buff = make_packet(2, member_isn, (remote_isn + 1));
-        if (buff == null) {
+        if (buff == null)
             kill("ERROR: Failed to make SYN/ACK.");
-        }
 
-        // send SYN/ACK
+        /* send SYN/ACK */
         while (true) {
             if (send_packet(buff)) {
                 println(TAG.SYNC + "  : SYN/ACK sent --> seq# " + member_isn +
@@ -364,13 +359,13 @@ public class RDT_Receiver extends RDT_Protocol {
             }
         }
 
-        // receive ACK
+        /* receive ACK */
         while (true) {
             payload = receive_packet(DEFAULT_TCP_HEAD);
             if ((payload != null) && payload.get_ACK() &&
-                (payload.get_ack_num() == (member_isn + 1)))
-            {
-                println(TAG.SYNC + "  : Received ACK --> ack# " + (member_isn + 1));
+                (payload.get_ack_num() == (member_isn + 1))) {
+                println(TAG.SYNC + "  : Received ACK --> ack# " + 
+                	   (member_isn + 1));
                 timer.stop_timer(member_isn + 1);
                 log(payload);
                 break;
@@ -381,18 +376,16 @@ public class RDT_Receiver extends RDT_Protocol {
     @Override
     protected void disconnect() {
 
-        // stop the timer if it's still running
-        if (timer.running) {
+        /* stop the timer if it's still running */
+        if (timer.running)
             timer.stop_timer(timer.seq_num);
-        }
 
-        // make FIN
+        /* make FIN */
         byte[] buff = make_packet(4, receiver_seq_num, 0);
-        if (buff == null) {
+        if (buff == null)
             kill("ERROR: Failed to make FIN.");
-        }
 
-        // send FIN
+        /* send FIN */
         while (true) {
             if (send_packet(buff)) {
                 println(TAG.CLOSE + " : Sent FIN --> seq# " + receiver_seq_num);
@@ -404,13 +397,12 @@ public class RDT_Receiver extends RDT_Protocol {
         TCP_Packet payload;
         boolean successful;
 
-        // receive FIN/ACK
+        /* receive FIN/ACK */
         while (true) {
             try {
                 payload = receive_packet(DEFAULT_TCP_HEAD);
                 if ((payload != null) && payload.get_ACK() &&
-                        (payload.get_ack_num() == (receiver_seq_num + 1)))
-                {
+                        (payload.get_ack_num() == (receiver_seq_num + 1))) {
                     println(TAG.CLOSE + " : Received FIN/ACK --> seq# " +
                             payload.get_seq_num() + " / ack# " +
                             payload.get_ack_num());
@@ -453,14 +445,14 @@ public class RDT_Receiver extends RDT_Protocol {
     }
 
     /**
-     * The main method.
+     * The main entry point.
      * @param args: The CL args.
      */
     public static void main(String[] args) {
 
         if (((args.length != 6) ||
-                !args[5].equals("debug")) && (args.length != 5))
-        {
+                !args[5].equals("debug")) && (args.length != 5)) {
+
             System.out.println("Usage: Receiver <filename>" +
                     " <log_filename> <sender_IP> <sender_port> " +
                     "<listen_port>  optional: <debug>");
