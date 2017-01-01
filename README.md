@@ -44,8 +44,8 @@
 
 #####Makefile
 
-`make` compiles the `.java` source files using the `javac` compiler.
-`make clean` will clean all auxiliary `.class` files.
+* `make` compiles the `.java` source files using the `javac` compiler.
+* `make clean` will clean all auxiliary `.class` files.
 
 #####Usage
 
