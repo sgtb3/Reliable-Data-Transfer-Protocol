@@ -5,45 +5,46 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.*;
-import java.util.Arrays;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-abstract class RDT_Protocol {
+public abstract class RdtProtocol {
 
-    enum TAG { SYNC, SEND, RECV, CLOSE, HOOK }       /* for debugging */
+    protected enum TAG { SYNC, SEND, RECV, CLOSE, HOOK } // for debugging
 
-    static final int MAX_OVERFLOW = 2000;            /* max allowable repeated packets */
-    protected static final int DEFAULT_TCP_HEAD = 20;/* in bytes */
-    protected static final int MSS = 576;            /* in bytes */
-
-    protected boolean stdout;
-    boolean debug_mode;
-    protected short remote_port;
-    protected short listen_port;
-    protected short window_size;
-    protected int next_seq_num;
+    protected static final int MAXOVERFLOW = 2000;       // max repeated packets
+    protected static final int DEFTCPHEAD = 20;          // in bytes
+    protected static final int MSS = 576;                // in bytes
+    protected boolean debugMode;
+    protected short remotePort;
+    protected short listenPort;
+    protected short windowSize;
+    protected int nextSeqNum;
     protected int corrupted;
     protected int duplicates;
-    int member_isn;
-    int remote_isn;
-    int remote_fsn;
-    int bytes_trans;
-    protected long start_time;
-    protected long end_time;
-    private long log_entry;
-    protected File data_file;
-    protected File log_file;
+    protected int memberIsn;
+    protected int remoteIsn;
+    protected int remoteFsn;
+    protected int bytesTrans;
+    protected long startTime;
+    protected long endTime;
+    protected File dataFile;
     protected Timer timer;
-    private PrintWriter logger;
-    protected InetAddress remote_addr;
-    protected DatagramSocket listen_sock;
-    protected DatagramSocket send_sock;
-    protected FileOutputStream file_writer;
+    protected InetAddress remoteAddr;
+    protected DatagramSocket listenSock;
+    protected DatagramSocket sendSock;
+    protected FileOutputStream fileWriter;
     protected CopyOnWriteArrayList<Thread> threads;
+
+    private boolean stdout;
+    private long logEntry;
+    private File logFile;
+    private PrintWriter logger;
 
     /**
      * Constructs a new protocol member.
@@ -52,37 +53,37 @@ abstract class RDT_Protocol {
      * @param debug : True - for debugging mode.
      *              : False - otherwise
      */
-    RDT_Protocol(String[] args, boolean debug) {
+    public RdtProtocol(String[] args, boolean debug) {
 
         threads = new CopyOnWriteArrayList<>();
-        member_isn = new Random().nextInt(1000);
-        debug_mode = debug;
-        remote_isn = 0;
-        next_seq_num = 0;
-        log_entry    = 0;
-        corrupted    = 0;
-        duplicates   = 0;
-        bytes_trans  = 0;
+        memberIsn = new Random().nextInt(1000);
+        debugMode = debug;
+        remoteIsn = 0;
+        nextSeqNum = 0;
+        logEntry = 0;
+        corrupted = 0;
+        duplicates = 0;
+        bytesTrans = 0;
 
         try {
 
-            data_file   = new File(args[0]);
-            log_file    = new File(args[1]);
-            remote_addr = InetAddress.getByName(args[2]);
-            remote_port = Short.parseShort(args[3]);
-            listen_port = Short.parseShort(args[4]);
-            listen_sock = new DatagramSocket(listen_port);
-            send_sock   = new DatagramSocket();
-            stdout      = (args[1].equals("stdout"));
+            dataFile = new File(args[0]);
+            logFile = new File(args[1]);
+            remoteAddr = InetAddress.getByName(args[2]);
+            remotePort = Short.parseShort(args[3]);
+            listenPort = Short.parseShort(args[4]);
+            listenSock = new DatagramSocket(listenPort);
+            sendSock = new DatagramSocket();
+            stdout = (args[1].equals("stdout"));
 
             /* if output requested to console */
             if (stdout) {
-                log_file = File.createTempFile("temp", ".txt");
-                log_file.deleteOnExit();
+                logFile = File.createTempFile("temp", ".txt");
+                logFile.deleteOnExit();
             } else {
-                log_file = new File(args[1]);
+                logFile = new File(args[1]);
             }
-            logger = new PrintWriter(new FileWriter(log_file, false));
+            logger = new PrintWriter(new FileWriter(logFile, false));
 
             logger.println(String.format(
                     "%-20s%-16s%-8s%-8s%-11s%-11s%-26s%-18s",
@@ -105,6 +106,8 @@ abstract class RDT_Protocol {
         else
             System.out.println(divider);
 
+        System.out.println("Total args passed: " + args.length);
+
         try {
             System.out.println(
                     "\tFile name:      "   + args[0] +
@@ -114,28 +117,27 @@ abstract class RDT_Protocol {
                     "\n\tListening port: " + args[4]);
 
             if (args.length > 6) {
-                window_size = Short.parseShort(args[5]);
+                windowSize = Short.parseShort(args[5]);
                 System.out.println("\tWindow Size:    " + args[5]);
             }
-
         } catch (Exception e) {
-            kill("Error: Improper argument format.");
+            kill("Error: Improper argument format." + e.getMessage());
         }
         System.out.println(divider);
 
         /* for debugging */
-        if (debug_mode)
+        if (debugMode)
             Runtime.getRuntime().traceMethodCalls(true);
 
-        start_shutdown_hook();
+        startShutdownHook();
 
         /* instantiate timer */
-        inst_timer();
+        instTimer();
 
         /* instantiate handlers */
-        inst_handlers();
+        instHandlers();
 
-        System.out.println("\n\n" + divider + "\n" + get_timestamp() +
+        System.out.println("\n\n" + divider + "\n" + getTimestamp() +
                            ": Establishing connection ...");
 
         /* start the timer */
@@ -144,19 +146,19 @@ abstract class RDT_Protocol {
         /* perform the handshake */
         connect();
 
-        System.out.println(get_timestamp() + ": Connection established." +
+        System.out.println(getTimestamp() + ": Connection established." +
                 "\n" + divider + "\n\n\n" + divider);
 
-        if (!debug_mode)
-            System.out.println(get_timestamp() + ": Transferring file ... ");
+        if (!debugMode)
+            System.out.println(getTimestamp() + ": Transferring file ... ");
 
         /* start the data and ACK handlers and record times */
-        start_time = System.currentTimeMillis();
-        start_handlers();
-        end_time = System.currentTimeMillis();
+        startTime = System.currentTimeMillis();
+        startHandlers();
+        endTime = System.currentTimeMillis();
 
         System.out.println(divider + "\n\n\n" + divider + "\n" +
-                get_timestamp() + ": Closing connection...");
+                getTimestamp() + ": Closing connection...");
 
         /* close the connection */
         disconnect();
@@ -173,12 +175,12 @@ abstract class RDT_Protocol {
     /**
      * Instantiates the ACK and Data Handler threads.
      */
-    abstract void inst_handlers();
+    abstract void instHandlers();
 
     /**
      * Starts the ACK and Data Handler threads.
      */
-    abstract void start_handlers();
+    abstract void startHandlers();
 
     /**
      * Performs the TCP 3-way handshake to synchronize
@@ -195,23 +197,23 @@ abstract class RDT_Protocol {
     /**
      * Prints the file transfer statistics upon termination.
      */
-    abstract void print_stats();
+    abstract void printStats();
 
     /**
      * A hook that captures interrupt signals.
      */
-    protected void start_shutdown_hook() {
+    private void startShutdownHook() {
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
 
                 /* close listening socket */
-                if (listen_sock != null && !listen_sock.isClosed())
-                    listen_sock.close();
+                if (listenSock != null && !listenSock.isClosed())
+                    listenSock.close();
 
                 /* interrupt any running threads */
-                if (debug_mode) {
+                if (debugMode) {
 
                     threads.stream().filter(Thread::isAlive).forEach(t -> {
                         System.out.println(TAG.HOOK + "  : " + t.getName() +
@@ -229,24 +231,23 @@ abstract class RDT_Protocol {
                 }
 
                 /* print file transfer statistics */
-                print_stats();
+                printStats();
 
                 /* flush any remaining content */
                 logger.flush();
 
                 /* print to console if necessary */
                 if (stdout) {
-
-                    try (BufferedReader log_reader =
-                                 new BufferedReader(new FileReader(log_file))) {
+                    try (BufferedReader logReader =
+                                 new BufferedReader(new FileReader(logFile))) {
                         System.out.println(TAG.HOOK +
                                            "  : Received Packet Log:");
                         String line;
-                        while ((line = log_reader.readLine()) != null)
+                        while ((line = logReader.readLine()) != null)
                             System.out.println(line);
 
                     } catch (IOException e) {
-                        println("ERROR: Unable to read line from " + log_file);
+                        println("ERROR: Unable to read line from " + logFile);
                     }
                 }
 
@@ -258,8 +259,8 @@ abstract class RDT_Protocol {
     /**
      * Instantiates the Timer.
      */
-    protected void inst_timer() {
-        timer = new Timer(debug_mode);
+    private void instTimer() {
+        timer = new Timer(debugMode);
         timer.setName("Timer Thread");
         threads.add(timer);
     }
@@ -279,21 +280,21 @@ abstract class RDT_Protocol {
      *
      * @param msg : The message to be displayed.
      */
-    protected void println(String msg) {
-        if (debug_mode)
-            System.out.println(get_timestamp() + msg);
+    void println(String msg) {
+        if (debugMode)
+            System.out.println(getTimestamp() + msg);
     }
 
     /**
      * Sends a datagram to the sender.
      *
-     * @param buff : The TCP_Packet encoded as a byte array
+     * @param buff : The TcpPacket encoded as a byte array
      * @return     : True on success, false otherwise
      */
-    protected boolean send_packet(byte[] buff) {
+    protected boolean sendPacket(byte[] buff) {
         try {
-            send_sock.send(new DatagramPacket(buff, buff.length,
-                           remote_addr, remote_port));
+            sendSock.send(new DatagramPacket(buff, buff.length,
+                    remoteAddr, remotePort));
             return true;
         } catch (IOException e) {
             return false;
@@ -303,33 +304,34 @@ abstract class RDT_Protocol {
     /**
      * Attempts to receive incoming datagrams into the buffer.
      *
-     * @param buff_size : The size of the receive buffer.
-     * @return          : If not corrupt - the decoded TCP_Packet object.
-     *                  : Null, otherwise.
+     * @param buffSize : The size of the receive buffer.
+     * @return         : If not corrupt - the decoded TcpPacket object.
+     *                 : Null, otherwise.
      */
-    protected TCP_Packet receive_packet(int buff_size) {
+    protected TcpPacket receivePacket(int buffSize) {
 
         try {
 
-            byte[] buff = new byte[buff_size];
+            byte[] buff = new byte[buffSize];
             DatagramPacket packet = new DatagramPacket(buff, buff.length);
 
-            listen_sock.setSoTimeout(timer.timeout);
-            listen_sock.receive(packet);
+            listenSock.setSoTimeout(timer.timeout);
+            listenSock.receive(packet);
 
-            TCP_Packet payload = new TCP_Packet();
+            TcpPacket payload = new TcpPacket();
             payload.extract(packet.getData());
 
             /* check for corruption */
-            byte[] sent = payload.get_segment();
+            byte[] sent = payload.getSegment();
             sent[16] = 0;
             sent[17] = 0;
-            if (payload.get_checksum() != payload.calculate_checksum(sent)) {
+
+            if (payload.getChecksum() != payload.calculateChecksum(sent)) {
                 corrupted++;
                 return null;
             }
-
             return payload;
+
         } catch (Exception e) {
             return null;
         }
@@ -340,31 +342,31 @@ abstract class RDT_Protocol {
      *
      * @return : String formatted timestamp.
      */
-    protected String get_timestamp() {
+    protected String getTimestamp() {
         return new SimpleDateFormat("[HH:mm:ss:SSS] ").
                 format(Calendar.getInstance().getTime());
     }
 
     /**
-     * Logs the contents of the TCP_Packet payload object to the logfile.
+     * Logs the contents of the TcpPacket payload object to the logfile.
      *
-     * @param payload : The TCP_Packet payload.
+     * @param payload : The TcpPacket payload.
      */
-    protected synchronized void log(TCP_Packet payload) {
+    protected synchronized void log(TcpPacket payload) {
 
         String flags = "";
-        flags += payload.get_URG() ? "URG " : " -  ";
-        flags += payload.get_ACK() ? "ACK " : " -  ";
-        flags += payload.get_PSH() ? "PSH " : " -  ";
-        flags += payload.get_RST() ? "RST " : " -  ";
-        flags += payload.get_SYN() ? "SYN " : " -  ";
-        flags += payload.get_FIN() ? "FIN " : " -  ";
+        flags += payload.getUrg() ? "URG " : " -  ";
+        flags += payload.getAck() ? "ACK " : " -  ";
+        flags += payload.getPsh() ? "PSH " : " -  ";
+        flags += payload.getRst() ? "RST " : " -  ";
+        flags += payload.getSyn() ? "SYN " : " -  ";
+        flags += payload.getFin() ? "FIN " : " -  ";
         logger.println(
                 String.format("%-20s%-16s%-8d%-8d%-11d%-11d%-26s%-18s",
-                        log_entry++, get_timestamp(), payload.get_src_port(),
-                        payload.get_dest_port(), payload.get_seq_num(),
-                        payload.get_ack_num(), flags,
-                        Double.toString(timer.est_rtt))
+                        logEntry++, getTimestamp(), payload.getSrcPort(),
+                        payload.getDestPort(), payload.getSeqNum(),
+                        payload.getAckNum(), flags,
+                        Double.toString(timer.estRtt))
         );
     }
 }

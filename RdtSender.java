@@ -5,14 +5,14 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-public class RDT_Sender extends RDT_Protocol {
+public class RdtSender extends RdtProtocol {
 
-    private boolean FIN_sent;
-    private boolean FINACK_recv;
+    private boolean finSent;
+    private boolean finAckRecv;
     private int base;
-    private int padding_bytes;
-    private ACK_Handler ah;
-    private Data_Handler dh;
+    private int paddingBytes;
+    private AckHandler ah;
+    private DataHandler dh;
     private ConcurrentHashMap<Integer, Segment> segments;
 
     /**
@@ -22,76 +22,74 @@ public class RDT_Sender extends RDT_Protocol {
      * @param debug : True - for debugging mode.
      *              : False - otherwise
      */
-    private RDT_Sender(String[] args, boolean debug) {
+    private RdtSender(String[] args, boolean debug) {
         super(args, debug);
     }
 
-    /**
-     * Handles the Sender's outgoing actions (sending data).
-     */
-    private class Data_Handler extends Thread {
+    /** Handles the Sender's outgoing actions (sending data). */
+    private class DataHandler extends Thread {
 
         @Override
         public void run() {
 
-            println(TAG.SEND + "  : Data_Handler running ...");
+            println(TAG.SEND + "  : DataHandler running ...");
 
-            int overflow_count = 0;
-            int prev_seq_num = -1;
-            int curr_seq_num;
-            int curr_seg_num;
-            int total_segs = segments.size();
-            Segment final_seg = segments.get(total_segs-1);
-            Segment curr_seg;
+            int overflowCount = 0;
+            int prevSeqNum = -1;
+            int currSeqNum;
+            int currSegNum;
+            int totalSegs = segments.size();
+            Segment finalSeg = segments.get(totalSegs-1);
+            Segment currSeg;
             byte[] buff;
-            boolean is_final_seg;
+            boolean isFinalSeg;
 
             while (true) {
 
                 /* break if final data segment acknowledged */
-                if (final_seg.acked)
+                if (finalSeg.acked)
                     break;
 
                 /* for concurrency issues, save current sequence number */
-                curr_seq_num = next_seq_num;
-                curr_seg = find_segment(curr_seq_num, 1);
-                if (curr_seg == null)
+                currSeqNum = nextSeqNum;
+                currSeg = findSegment(currSeqNum, 1);
+                if (currSeg == null)
                     kill("ERROR: Failed to find " +
-                         "packet with seq num (" + curr_seq_num + ")");
+                         "packet with seq num (" + currSeqNum + ")");
 
                 /* save corresponding segment number */
-                curr_seg_num = curr_seg.seg_num;
-                is_final_seg = (curr_seg_num + 1) >= total_segs;
+                currSegNum = currSeg.segNum;
+                isFinalSeg = (currSegNum + 1) >= totalSegs;
 
                 /*
-                 * if final seg make final payload with FIN flag set.
+                 * if final seg, make final payload with FIN flag set.
                  * otherwise, create non-FIN TCP payload with data
                  */
-                buff = make_packet(is_final_seg ? 4 : 3, curr_seq_num, 0,
-                       curr_seg.get_data());
+                buff = makePacket(isFinalSeg ? 4 : 3, currSeqNum, 0,
+                       currSeg.getData());
 
-                if (is_final_seg) {
+                if (isFinalSeg) {
 
                     while (true) {
 
                         /* send the final segment */
-                        if (!send_packet(buff))
+                        if (!sendPacket(buff))
                             continue;
 
                         /* add to list of sent packets if needed */
-                        if (!curr_seg.sent)
-                            bytes_trans += curr_seg.get_data().length;
+                        if (!currSeg.sent)
+                            bytesTrans += currSeg.getData().length;
 
                         /* start timer if it's not running */
                         if (!timer.running)
-                            timer.start_timer(curr_seq_num);
+                            timer.startTimer(currSeqNum);
 
                         /* update fields */
-                        curr_seg.sent = true;
-                        curr_seg.time_sent = System.currentTimeMillis();
-                        FIN_sent = true;
+                        currSeg.sent = true;
+                        currSeg.timeSent = System.currentTimeMillis();
+                        finSent = true;
                         println(TAG.SEND + "  : (FINAL) seq# --> " + 
-                        		curr_seq_num);
+                        		currSeqNum);
 
                         /* sleep for the maximum allowable time */
                         try {
@@ -99,14 +97,14 @@ public class RDT_Sender extends RDT_Protocol {
                         } catch (InterruptedException ignored) {}
 
                         /* break if final segment has been acked */
-                        if (curr_seg.acked)
+                        if (currSeg.acked)
                             break;
                     }
 
                 } else {
 
                     /* check if sequence number is withing max window size */
-                    if (curr_seq_num >= (base + window_size)) {
+                    if (currSeqNum >= (base + windowSize)) {
 
                         try {
                             println(TAG.SEND + 
@@ -115,14 +113,14 @@ public class RDT_Sender extends RDT_Protocol {
                         } catch (InterruptedException ignored) {}
 
                         /* check if timeout event has occurred during sleep */
-                        if (timer.timeout_event) {
-                            next_seq_num = base;
-                            println(TAG.SEND + "  : Detected timeout_event. " +
+                        if (timer.timeoutEvent) {
+                            nextSeqNum = base;
+                            println(TAG.SEND + "  : Detected timeoutEvent. " +
                                     "Resending all packets starting with " + 
                                     "base --> seq# " + base);
 
-                        } else if ((prev_seq_num == curr_seq_num) &&
-                                   (++overflow_count >= MAX_OVERFLOW)) {
+                        } else if ((prevSeqNum == currSeqNum) &&
+                                   (++overflowCount >= MAXOVERFLOW)) {
                             /* prevent packet overflow attack */
                             kill("ERROR: Network error - Packet overflow.");
                         }
@@ -130,69 +128,67 @@ public class RDT_Sender extends RDT_Protocol {
                     }
 
                     /* send non-final data packet */
-                    if (!send_packet(buff))
+                    if (!sendPacket(buff))
                         continue;
 
                     /* add to list of sent packets if needed */
-                    if (!curr_seg.sent)
-                        bytes_trans += curr_seg.get_data().length;
+                    if (!currSeg.sent)
+                        bytesTrans += currSeg.getData().length;
 
                     /* update segment fields */
-                    curr_seg.sent = true;
-                    curr_seg.time_sent = System.currentTimeMillis();
+                    currSeg.sent = true;
+                    currSeg.timeSent = System.currentTimeMillis();
 
                     /* start the timer if it's not running */
                     if (!timer.running)
-                        timer.start_timer(curr_seq_num);
+                        timer.startTimer(currSeqNum);
 
-                    println(TAG.SEND + "  : --> seq# " + curr_seq_num);
+                    println(TAG.SEND + "  : --> seq# " + currSeqNum);
 
                     /* increment next sequence number */
                     try {
-                        next_seq_num = segments.get(curr_seg_num + 1).seq_num;
+                        nextSeqNum = segments.get(currSegNum + 1).seqNum;
                     } catch (NullPointerException e) {
-                        if (FINACK_recv)
+                        if (finAckRecv)
                             break;
                     }
                 }
             }
 
-            println(TAG.SEND + "  : Data_Handler complete.");
+            println(TAG.SEND + "  : DataHandler complete.");
         }
     }
 
-    /**
-     * Handles the Sender's incoming actions (receiving acknowledgements).
-     */
-    private class ACK_Handler extends Thread {
+    /** Handles the Sender's incoming actions (receiving acknowledgements). */
+    private class AckHandler extends Thread {
 
         /**
          * Simulates the TCP fast retransmit mechanism.
          * 
-         * @param curr_ack : The ACK num to be retransmitted.
+         * @param currAck : The ACK num to be retransmitted.
          */
-        private void fast_retransmit(int curr_ack) {
+        private void fastRetransmit(int currAck) {
 
             /* find corresponding segment */
-            Segment retrans_seg = find_segment(curr_ack, 1);
+            Segment retransSeg = findSegment(currAck, 1);
 
-            if (retrans_seg == null)
+            if (retransSeg == null)
                 kill("ERROR. Failed to find segment in map!");
 
-            if (retrans_seg.seg_num < 0)
+            if (retransSeg.segNum < 0)
                 return;
 
             /* update the next sequence number */
-            next_seq_num = curr_ack;
+            nextSeqNum = currAck;
 
             println(TAG.RECV + "  : 3 duplicate ACKs received. Retransmitting" +
-                    " all packets starting with seq# " + curr_ack + " -->" +
-                    " (packet " + retrans_seg.seg_num + ")");
+                    " all packets starting with seq# " + currAck + " -->" +
+                    " (packet " + retransSeg.segNum + ")");
 
             /* update retransmission fields */
-            if (!retrans_seg.retrans) {
-                retrans_seg.retrans = true;
-                retrans_seg.retrans_count++;
+            if (!retransSeg.retrans) {
+                retransSeg.retrans = true;
+                retransSeg.retransCount++;
             }
         }
 
@@ -201,68 +197,68 @@ public class RDT_Sender extends RDT_Protocol {
 
             println(TAG.RECV + "  : Ack_Handler running...");
 
-            TCP_Packet payload;
-            int prev_ack;
-            int curr_ack;
-            int final_ack_num = segments.get(segments.size()-1).ack_num;
-            int prev_ack_retrans = -1;
-            int overflow_count = 0;
+            TcpPacket payload;
+            int prevAck;
+            int currAck;
+            int finalAckNum = segments.get(segments.size()-1).ackNum;
+            int prevAckRetrans = -1;
+            int overflowCount = 0;
 
             while (true) {
 
                 /* break if final segment acknowledged */
-                if (FINACK_recv)
+                if (finAckRecv)
                     break;
 
                 /* receive packet */
-                payload = receive_packet(DEFAULT_TCP_HEAD);
+                payload = receivePacket(DEFTCPHEAD);
                 if (payload == null)
                     continue;
 
                 /* get packet ack number */
-                curr_ack = payload.get_ack_num();
-                prev_ack = curr_ack;
+                currAck = payload.getAckNum();
+                prevAck = currAck;
 
                 /* check if valid ack number */
-                Segment recv_seg = find_segment(curr_ack, 2);
+                Segment recvSeg = findSegment(currAck, 2);
                 
-                if (recv_seg == null) {
+                if (recvSeg == null) {
 
                     println(TAG.RECV + "  : (Unknown) <-- ack# " +
-                            curr_ack + "  : " + payload);
+                            currAck + "  : " + payload);
 
                     /* prevent overflow from unknown ACKs */
-                    if ((curr_ack == prev_ack) && 
-                    	(++overflow_count > MAX_OVERFLOW))
+                    if ((currAck == prevAck) && 
+                    	(++overflowCount > MAXOVERFLOW))
                         kill("ERROR: Network error - Packet overflow.");
                     continue;
                 }
 
                 /* check for duplicate ACKs */
-                if (curr_ack == prev_ack) {
+                if (currAck == prevAck) {
 
-                    println(TAG.RECV + "  : <-- ack# " + curr_ack +
-                            " (Duplicate x" + (++recv_seg.ack_count) + ")");
+                    println(TAG.RECV + "  : <-- ack# " + currAck +
+                            " (Duplicate x" + (++recvSeg.ackCount) + ")");
 
                     /* if segment has been ACKed @ least 3 times in a row */
-                    if (recv_seg.ack_count >= 3) {
+                    if (recvSeg.ackCount >= 3) {
 
                         /* prevent overflow from repeated ACKs */
-                        if (recv_seg.ack_count >= MAX_OVERFLOW)
+                        if (recvSeg.ackCount >= MAXOVERFLOW)
                             kill("ERROR: Network error - Packet overflow.");
 
                         /* if timer is not running for a retransmitted ACK */
-                        if ((prev_ack_retrans != curr_ack) && !timer.running || 
-                        	(timer.seq_num != curr_ack)) {
+                        if ((prevAckRetrans != currAck) && !timer.running || 
+                        	(timer.seqNum != currAck)) {
 
                             println(TAG.RECV + 
                             		"  : Calling fast retransmit... ");
 
-                            fast_retransmit(curr_ack);
+                            fastRetransmit(currAck);
                            
                             /* reset the duplicate ack count */
-                            recv_seg.ack_count = 0; 
-                            prev_ack_retrans = curr_ack;
+                            recvSeg.ackCount = 0;
+                            prevAckRetrans = currAck;
                         }
 
                         continue;
@@ -270,38 +266,38 @@ public class RDT_Sender extends RDT_Protocol {
                 }
 
                 /* if final ACK */
-                if (FIN_sent && (curr_ack >= final_ack_num)) {
-                    println(TAG.RECV + "  : <-- (FINAL) ack# " + curr_ack);
-                    FINACK_recv = true;
-                } else if (!recv_seg.sent) {
-                    println(TAG.RECV + "  : ACK (ack# " + curr_ack + 
-                    		") doesn't correspond to any transmitted seq_num");
+                if (finSent && (currAck >= finalAckNum)) {
+                    println(TAG.RECV + "  : <-- (FINAL) ack# " + currAck);
+                    finAckRecv = true;
+                } else if (!recvSeg.sent) {
+                    println(TAG.RECV + "  : ACK (ack# " + currAck + 
+                    		") doesn't correspond to any transmitted seqNum");
                     continue;
                 }
 
                 /* start timer if it's not running */
                 if (!timer.running ||
-                   ((timer.seq_num < curr_ack) && !FINACK_recv))
-                    timer.start_timer(base);
+                   ((timer.seqNum < currAck) && !finAckRecv))
+                    timer.startTimer(base);
 
-                if ((curr_ack < final_ack_num) && !FINACK_recv)
-                    println(TAG.RECV + "  : <-- ack# " + curr_ack);
+                if ((currAck < finalAckNum) && !finAckRecv)
+                    println(TAG.RECV + "  : <-- ack# " + currAck);
 
                 /* update the base flag */
-                base = curr_ack;
-                if (!recv_seg.base)
-                    recv_seg.base = true;
+                base = currAck;
+                if (!recvSeg.base)
+                    recvSeg.base = true;
 
                 /* update the acked flag and timestamp, log packet */
-                if (!recv_seg.acked) {
-                    recv_seg.acked = true;
+                if (!recvSeg.acked) {
+                    recvSeg.acked = true;
                     log(payload);
                 }
 
-                recv_seg.time_acked = System.currentTimeMillis();
+                recvSeg.timeAcked = System.currentTimeMillis();
             }
 
-            println(TAG.RECV + "  : ACK_Handler complete.");
+            println(TAG.RECV + "  : AckHandler complete.");
         }
     }
 
@@ -309,39 +305,39 @@ public class RDT_Sender extends RDT_Protocol {
      * Segments the data file into MSS sized chunks and
      * places them in the segment hash map.
      */
-    private void segment_file() {
+    private void segmentFile() {
 
         try {
 
-            byte[] file_bytes = Files.readAllBytes(Paths.
-                                get(data_file.getAbsolutePath()));
-            int remaining = file_bytes.length;
-            int approx_size = Math.round(remaining/(MSS-DEFAULT_TCP_HEAD)) + 1;
-            segments = new ConcurrentHashMap<>(approx_size);
+            byte[] fileBytes = Files.readAllBytes(Paths.
+                                get(dataFile.getAbsolutePath()));
+            int remaining = fileBytes.length;
+            int approxSize = Math.round(remaining/(MSS- DEFTCPHEAD)) + 1;
+            segments = new ConcurrentHashMap<>(approxSize);
 
-            int total_read = 0;
-            int file_index = 0; /* i.e. seq number */
-            int map_index  = 0; /* i.e. seg number */
-            int seg_index;
+            int totalRead = 0;
+            int fileIndex = 0; /* i.e. seq number */
+            int mapIndex  = 0; /* i.e. seg number */
+            int segIndex;
             byte[] data;
             Segment seg;
 
             while (remaining > 0) {
 
-                seg  = new Segment(map_index, file_index);
-                data = new byte[(MSS-DEFAULT_TCP_HEAD)];
-                seg_index = 0;
+                seg  = new Segment(mapIndex, fileIndex);
+                data = new byte[(MSS- DEFTCPHEAD)];
+                segIndex = 0;
 
-                while ((seg_index < remaining) && (seg_index < data.length))
-                    data[seg_index++] = file_bytes[file_index++];
+                while ((segIndex < remaining) && (segIndex < data.length))
+                    data[segIndex++] = fileBytes[fileIndex++];
 
-                remaining -= seg_index;
-                total_read += data.length;
-                seg.set_data(data);
-                segments.put(map_index++, seg);
+                remaining -= segIndex;
+                totalRead += data.length;
+                seg.setData(data);
+                segments.put(mapIndex++, seg);
             }
 
-            padding_bytes = (int) (total_read - data_file.length());
+            paddingBytes = (int) (totalRead - dataFile.length());
 
         } catch (IOException e) {
             kill("ERROR: Failed to segment file: " + e.getCause());
@@ -358,41 +354,41 @@ public class RDT_Sender extends RDT_Protocol {
      *            : 6 - Create FIN/ACK packet.
      *            : 7 - Create RST packet.
      *            
-     * @return    : TCP_Packet encoded as a byte array.
+     * @return    : TcpPacket encoded as a byte array.
      */
-    private byte[] make_packet(int opt, int seq_num, int ack_num, byte[] data) {
+    private byte[] makePacket(int opt, int seqNum, int ackNum, byte[] data) {
 
-        TCP_Packet payload = new TCP_Packet();
-        payload.set_src_port(listen_sock.getLocalPort());
-        payload.set_dest_port(remote_port);
-        payload.set_seq_num(seq_num);
-        payload.set_ack_num(ack_num);
+        TcpPacket payload = new TcpPacket();
+        payload.setSrcPort(listenSock.getLocalPort());
+        payload.setDestPort(remotePort);
+        payload.setSeqNum(seqNum);
+        payload.setAckNum(ackNum);
 
         /* set flags */
         if (opt == 1)
-            payload.set_SYN(true);
+            payload.setSyn(true);
         
         if (opt == 2 || opt == 6)
-            payload.set_ACK(true);
+            payload.setAck(true);
         
         if (opt == 4 || opt == 5 || opt == 6) {
-            payload.set_FIN(true);
-            if (opt != 6 && padding_bytes != 0)
-                payload.set_options(payload.int_to_bytes(padding_bytes));
+            payload.setFin(true);
+            if (opt != 6 && paddingBytes != 0)
+                payload.setOptions(payload.intToBytes(paddingBytes));
         }
 
         if (opt == 7)
-            payload.set_RST(true);
+            payload.setRst(true);
 
         /* if packet contains data and options if necessary */
         if ((opt == 3 || opt == 4) && data != null)
-            payload.set_data(data);
+            payload.setData(data);
 
         /* encode and return packet */
         try {
             return payload.encode();
         } catch (Exception e) {
-            if (debug_mode)
+            if (debugMode)
                 e.printStackTrace();
             return null;
         }
@@ -407,7 +403,7 @@ public class RDT_Sender extends RDT_Protocol {
      *            
      * @return : A new ArrayList consisting of the sequence numbers.
      */
-    private ArrayList<Integer> get_seq_numbers(int opt) {
+    private ArrayList<Integer> getSeqNumbers(int opt) {
 
         ArrayList<Integer> list = new ArrayList<>();
         for (Integer entry : segments.keySet()) {
@@ -416,7 +412,7 @@ public class RDT_Sender extends RDT_Protocol {
                 ((opt == 2) && segments.get(entry).acked) ||
                 ((opt == 3) && segments.get(entry).retrans) ||
                 ((opt == 4) && segments.get(entry).base))
-                list.add(segments.get(entry).seq_num);
+                list.add(segments.get(entry).seqNum);
         }
 
         return list;
@@ -425,22 +421,22 @@ public class RDT_Sender extends RDT_Protocol {
     /**
      * Searches the segment map for a segment.
      * @param num     : The corresponding sequence or ACK number.
-     * @param opt     : 1 - search by seq_num
-     *                : 2 - search by ack_num
+     * @param opt     : 1 - search by seqNum
+     *                : 2 - search by ackNum
      *                
      * @return        : The Segment contained in the map, if it exists.
      *                : Null, otherwise.
      */
-    private Segment find_segment(int num, int opt) {
+    private Segment findSegment(int num, int opt) {
 
         if (opt == 1) {
             for (Integer entry : segments.keySet()) {
-                if (segments.get(entry).seq_num == num)
+                if (segments.get(entry).seqNum == num)
                     return segments.get(entry);
             }
         } else if (opt == 2) {
             for (Integer entry : segments.keySet()) {
-                if (segments.get(entry).ack_num == num)
+                if (segments.get(entry).ackNum == num)
                     return segments.get(entry);
             }
         }
@@ -449,22 +445,22 @@ public class RDT_Sender extends RDT_Protocol {
     }
 
     @Override
-    protected void inst_handlers() {
+    protected void instHandlers() {
 
         /* segment the file before instantiating handlers */
-        segment_file();
+        segmentFile();
 
-        ah = new ACK_Handler();
-        ah.setName("ACK_Handler Thread");
+        ah = new AckHandler();
+        ah.setName("AckHandler Thread");
         threads.add(ah);
 
-        dh = new Data_Handler();
-        dh.setName("Data_Handler Thread");
+        dh = new DataHandler();
+        dh.setName("DataHandler Thread");
         threads.add(dh);
     }
 
     @Override
-    protected void start_handlers() {
+    protected void startHandlers() {
 
         ah.start();
         dh.start();
@@ -473,7 +469,7 @@ public class RDT_Sender extends RDT_Protocol {
             dh.join();
         } catch (InterruptedException e) {
             kill("ERROR: Unable to complete file transfer!");
-            if (debug_mode)
+            if (debugMode)
                 e.printStackTrace();
         }
     }
@@ -481,53 +477,53 @@ public class RDT_Sender extends RDT_Protocol {
     @Override
     protected void connect() {
 
-        TCP_Packet payload;
+        TcpPacket payload;
         
         /* make SYN */
-        byte[] buff = make_packet(1, member_isn, 0, null);
+        byte[] buff = makePacket(1, memberIsn, 0, null);
         if (buff == null)
             kill("ERROR: Failed to make SYN.");
         
         /* send SYN */
         while (true) {
-            if (send_packet(buff)) {
-                println(TAG.SYNC + "  : SYN sent --> seq# " + member_isn);
-                timer.start_timer(member_isn);
+            if (sendPacket(buff)) {
+                println(TAG.SYNC + "  : SYN sent --> seq# " + memberIsn);
+                timer.startTimer(memberIsn);
                 break;
             }
         }
 
         /* receive SYN/ACK */
         while (true) {
-            payload = receive_packet(DEFAULT_TCP_HEAD);
-            if ((payload != null) && payload.get_SYN() && payload.get_ACK() &&
-                (payload.get_ack_num() == (member_isn+1))) {
-                remote_isn = payload.get_seq_num();
+            payload = receivePacket(DEFTCPHEAD);
+            if ((payload != null) && payload.getSyn() && payload.getAck() &&
+                (payload.getAckNum() == (memberIsn +1))) {
+                remoteIsn = payload.getSeqNum();
                 println(TAG.SYNC + "  : Received SYN/ACK --> seq# "
-                        + remote_isn + " / ack# " + (member_isn+1));
-                timer.stop_timer((member_isn+1), true);
+                        + remoteIsn + " / ack# " + (memberIsn +1));
+                timer.stopTimer((memberIsn +1), true);
                 log(payload);
                 break;
             }
         }
 
         /* make ACK */
-        buff = make_packet(2, (member_isn + 1), (remote_isn + 1), null);
+        buff = makePacket(2, (memberIsn + 1), (remoteIsn + 1), null);
         if (buff == null)
             kill("ERROR: Failed to make ACK.");
 
         /* send ACK */
         while (true) {
-            if (send_packet(buff)) {
-                println(TAG.SYNC + "  : Sent ACK --> ack# " + (member_isn + 1));
-                timer.start_timer(member_isn+1);
+            if (sendPacket(buff)) {
+                println(TAG.SYNC + "  : Sent ACK --> ack# " + (memberIsn + 1));
+                timer.startTimer(memberIsn +1);
                 break;
             }
         }
 
         /* reset the timer for data transfer */
-        timer.stop_timer(member_isn+1, true);
-        timer.seq_num = -1;
+        timer.stopTimer(memberIsn +1, true);
+        timer.seqNum = -1;
     }
 
     @Override
@@ -535,40 +531,38 @@ public class RDT_Sender extends RDT_Protocol {
 
         /* stop the timer if it's still running */
         if (timer.running) {
-
-            Segment seg = find_segment(timer.seq_num, 1);
-
+            Segment seg = findSegment(timer.seqNum, 1);
             if (seg != null && !seg.retrans)
-                timer.stop_timer(timer.seq_num, true);
+                timer.stopTimer(timer.seqNum, true);
             else
-                timer.stop_timer(timer.seq_num);
+                timer.stopTimer(timer.seqNum);
         }
 
-        TCP_Packet payload;
-        int remote_fsn;
+        TcpPacket payload;
+        int remoteFsn;
 
         /* receive FIN */
         while (true) {
-            payload = receive_packet(DEFAULT_TCP_HEAD);
-            if ((payload != null) && payload.get_FIN()) {
-                remote_fsn = payload.get_seq_num();
-                println(TAG.CLOSE + " : Received FIN --> seq# " + remote_fsn);
+            payload = receivePacket(DEFTCPHEAD);
+            if ((payload != null) && payload.getFin()) {
+                remoteFsn = payload.getSeqNum();
+                println(TAG.CLOSE + " : Received FIN --> seq# " + remoteFsn);
                 log(payload);
                 break;
             }
         }
 
         /* make FIN/ACK */
-        byte[] buff = make_packet(6, ++next_seq_num, ++remote_fsn, null);
+        byte[] buff = makePacket(6, ++nextSeqNum, ++remoteFsn, null);
         if (buff == null)
             kill("ERROR: Failed to make Receiver's FIN/ACK.");
 
         /* send FIN/ACK */
         while (true) {
-            if (send_packet(buff)) {
-                timer.start_timer(next_seq_num);
-                println(TAG.CLOSE + " : Sent FIN/ACK --> seq# " + next_seq_num +
-                        " / ack# " + remote_fsn);
+            if (sendPacket(buff)) {
+                timer.startTimer(nextSeqNum);
+                println(TAG.CLOSE + " : Sent FIN/ACK --> seq# " + nextSeqNum +
+                        " / ack# " + remoteFsn);
                 break;
             }
         }
@@ -576,8 +570,8 @@ public class RDT_Sender extends RDT_Protocol {
         /* wait for final timeout */
         boolean successful = true;
         while (true) {
-            if (!timer.timeout_event && (timer.time_remaining > 0)) {
-                payload = receive_packet(DEFAULT_TCP_HEAD);
+            if (!timer.timeoutEvent && (timer.timeRemaining > 0)) {
+                payload = receivePacket(DEFTCPHEAD);
                 if (payload != null)
                     successful = false;
             } else {
@@ -589,30 +583,28 @@ public class RDT_Sender extends RDT_Protocol {
         String msg = successful ? "Connection closed."
                      : "Connection closed improperly.";
 
-        System.out.println(get_timestamp() + ": " + msg +
+        System.out.println(getTimestamp() + ": " + msg +
                 " File transfer completed successfully.");
     }
 
     @Override
-    protected void print_stats() {
+    protected void printStats() {
 
-        long trans_time_sec = TimeUnit.MILLISECONDS.
-                              toSeconds(end_time - start_time);
-
-        ArrayList<Integer> sent  = get_seq_numbers(1);
-        ArrayList<Integer> acked = get_seq_numbers(2);
+        long transTimeSec = TimeUnit.MILLISECONDS.toSeconds(endTime-startTime);
+        ArrayList<Integer> sent  = getSeqNumbers(1);
+        ArrayList<Integer> acked = getSeqNumbers(2);
 
         System.out.println(
                 "=============================" +
                 "============================" +
                 "\n\t\t\tFILE TRANSFER STATISTICS" +
-                "\nFile transfer time: (" + trans_time_sec + ") s" +
-                "\nFile size: (" + data_file.length() + ") bytes" +
-                "\n(" + bytes_trans + ") bytes sent" +
-                "\nFinal segment padded with (" + padding_bytes + ") bytes" +
+                "\nFile transfer time: (" + transTimeSec + ") seconds" +
+                "\nFile size: (" + dataFile.length() + ") bytes" +
+                "\n(" + bytesTrans + ") bytes sent" +
+                "\nFinal segment padded with (" + paddingBytes + ") bytes" +
                 "\nEnding timeout: " + timer.timeout + " ms" +
-                "\nEnding est_RTT: " + timer.est_rtt + " ms" +
-                "\nEnding dev_RTT: " + timer.dev_rtt + " ms" +
+                "\nEnding est_RTT: " + timer.estRtt + " ms" +
+                "\nEnding dev_RTT: " + timer.devRtt + " ms" +
                 "\n(" + acked.size() + ") valid ACKs received " +
                 "\n(" + corrupted + ") corrupted ACKs received" +
                 "\n(" + duplicates + ") duplicates ACKs received" +
@@ -632,12 +624,11 @@ public class RDT_Sender extends RDT_Protocol {
         if (((args.length != 7) ||
              !args[6].equals("debug")) && (args.length != 6)) {
 
-            System.out.println("Usage: Sender <filename> <log_filename> " +
-                    "<receiver_IP> <receiver_port> <listen_port>  " +
-                    "<window_size> optional: <debug>");
+            System.out.println("Usage: RdtSender <filename> <log_filename> " +
+                    "<receiver_IP> <receiver_port> <listening_port>  " +
+                    "<windowSize> optional: <debug>");
             System.exit(-1);
         }
-
-        new RDT_Sender(args, (args.length == 7));
+        new RdtSender(args, (args.length == 7));
     }
 }

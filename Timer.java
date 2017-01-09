@@ -6,39 +6,37 @@ public class Timer extends Thread {
     private static final double BETA = 0.25;
     private static final double ALPHA = 0.125;
     private boolean alive;
-    private boolean debug_mode;
-    private long start_time;
-    private long samp_rtt;
-    boolean timeout_event;
-    boolean running;
-    int timeout;  /* milliseconds */
-    int seq_num;
-    long time_remaining;
-    long est_rtt; /* a weighted avg of the sample_rtt's */
-    long dev_rtt; /* an estimate of variability of the sample_rtt's from the est_rtt */
+    private boolean debugMode;
+    private long startTime;
+    private long sampRtt;
+    protected boolean timeoutEvent;
+    protected boolean running;
+    protected int timeout;  /* milliseconds */
+    protected int seqNum;
+    protected long timeRemaining;
+    protected long estRtt; /* a weighted avg of the sample_rtt's */
+    protected long devRtt; /* an estimate of variability of the sample_rtt's from the estRtt */
 
     /**
      * Constructs a new Timer object.
      *
-     * @param debug_mode : If true, will print degugging statements.
+     * @param debugMode : If true, will print debugging statements.
      */
-    public Timer(boolean debug_mode) {
+    public Timer(boolean debugMode) {
 
-        this.debug_mode = debug_mode;
-        timeout_event   = false;
+        this.debugMode = debugMode;
+        timeoutEvent = false;
         running         = false;
         alive           = true;
         timeout         =  1;
-        seq_num         = -1;
-        start_time      =  0;
-        samp_rtt        =  1;
-        est_rtt         =  1;
-        dev_rtt         =  1;
+        seqNum = -1;
+        startTime =  0;
+        sampRtt =  1;
+        estRtt =  1;
+        devRtt =  1;
     }
 
-    /**
-     * Shuts down the timer.
-     */
+    /** Shuts down the timer. */
     public void shutdown() {
         alive = false;
         running = false;
@@ -55,16 +53,16 @@ public class Timer extends Thread {
                continue;
 
             /* calculate inactivity times */
-            long time_inactive = System.currentTimeMillis() - start_time;
-            time_remaining = timeout - time_inactive;
+            long timeInactive = System.currentTimeMillis() - startTime;
+            timeRemaining = timeout - timeInactive;
 
             /* if time elapsed is > timeout */
-            if (time_remaining <= 0) {
-                timeout_event = true;
-                stop_timer(seq_num, false);
+            if (timeRemaining <= 0) {
+                timeoutEvent = true;
+                stopTimer(seqNum, false);
             } else {
                 try {
-                    sleep(time_remaining);
+                    sleep(timeRemaining);
                 } catch (InterruptedException ignored) {}
             }
         }
@@ -75,47 +73,47 @@ public class Timer extends Thread {
     /**
      * Starts the timer.
      *
-     * @param seq_num : The packet sequence number.
+     * @param seqNum : The packet sequence number.
      */
-    synchronized void start_timer(int seq_num) {
+    protected synchronized void startTimer(int seqNum) {
 
         if (running) {
-            if (this.seq_num == seq_num) {
-                start_time = System.currentTimeMillis();
-                println("RESTARTED for seq# " + seq_num);
+            if (this.seqNum == seqNum) {
+                startTime = System.currentTimeMillis();
+                println("RESTARTED for seq# " + seqNum);
             } else {
-                stop_timer(this.seq_num);
-                start_timer(seq_num);
+                stopTimer(this.seqNum);
+                startTimer(seqNum);
             }
         } else {
-            start_time = System.currentTimeMillis();
-            this.seq_num = seq_num;
+            startTime = System.currentTimeMillis();
+            this.seqNum = seqNum;
             running = true;
-            println("STARTED for seq# " + seq_num);
+            println("STARTED for seq# " + seqNum);
         }
     }
 
     /**
      * Stops the timer.
      *
-     * @param ack_num : The acknowledgement number.
-     * @param update_rtt: If set, this method will additional update the
+     * @param ackNum    : The acknowledgement number.
+     * @param updateRtt : If set, this method will additionally update the
      *                    return-trip-time statistics.
      */
-    synchronized void stop_timer(int ack_num, boolean update_rtt) {
+    protected synchronized void stopTimer(int ackNum, boolean updateRtt) {
 
-        if (running && (ack_num >= seq_num)) {
+        if (running && (ackNum >= seqNum)) {
 
             running = false;
-            String msg = "STOPPED for seq# " + seq_num +
-                         ", ack# " + ack_num + "\n";
+            String msg = "STOPPED for seq# " + seqNum +
+                         ", ack# " + ackNum + "\n";
 
-            if (update_rtt) {
-                samp_rtt = System.currentTimeMillis() - start_time;
-                update_rtt_stats();
-                msg +=  "(samp_rtt: " + samp_rtt + " ms) " +
-                        "(est_rtt: " + est_rtt + " ms) " +
-                        "(dev_rtt: " + dev_rtt + " ms) " +
+            if (updateRtt) {
+                sampRtt = System.currentTimeMillis() - startTime;
+                updateRttStats();
+                msg +=  "(sampRtt: " + sampRtt + " ms) " +
+                        "(estRtt: " + estRtt + " ms) " +
+                        "(devRtt: " + devRtt + " ms) " +
                         "(timeout: " + timeout + " ms)\n";
             }
             println(msg);
@@ -125,10 +123,10 @@ public class Timer extends Thread {
     /**
      * Stops the timer.
      *
-     * @param ack_num : The acknowledgement number.
+     * @param ackNum : The acknowledgement number.
      */
-    synchronized void stop_timer(int ack_num) {
-        stop_timer(ack_num, false);
+    synchronized void stopTimer(int ackNum) {
+        stopTimer(ackNum, false);
     }
 
     /**
@@ -137,7 +135,7 @@ public class Timer extends Thread {
      * @param msg : The message to be displayed.
      */
     private void println(String msg) {
-        if (debug_mode)
+        if (debugMode)
             System.out.println(new SimpleDateFormat("[HH:mm:ss:SSS] ").format
                     (Calendar.getInstance().getTime()) + "TIMER : " + msg);
     }
@@ -145,12 +143,12 @@ public class Timer extends Thread {
     /**
      * Updates the Round Trip Time variables.
      */
-    private synchronized void update_rtt_stats() {
+    private synchronized void updateRttStats() {
 
-        est_rtt = Math.round(((1 - ALPHA) * est_rtt) +
-                  (ALPHA * samp_rtt));
-        dev_rtt = Math.round(((1 - BETA) * dev_rtt) +
-                  (BETA * Math.abs(samp_rtt - est_rtt)));
-        timeout = new Double(est_rtt + (4 * dev_rtt)).intValue();
+        estRtt = Math.round(((1 - ALPHA) * estRtt) +
+                  (ALPHA * sampRtt));
+        devRtt = Math.round(((1 - BETA) * devRtt) +
+                  (BETA * Math.abs(sampRtt - estRtt)));
+        timeout = new Double(estRtt + (4 * devRtt)).intValue();
     }
 }

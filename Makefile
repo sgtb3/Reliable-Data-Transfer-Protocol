@@ -7,8 +7,8 @@ JC = javac
 	$(JC) $(JFLAGS) $*.java
 
 CLASSES = \
-    RDT_Receiver.java \
-    RDT_Sender.java \
+    RdtReceiver.java \
+    RdtSender.java \
 
 default: clean classes 
 

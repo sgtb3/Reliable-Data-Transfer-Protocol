@@ -3,70 +3,67 @@ import java.util.ArrayList;
 public class Segment {
 
     private byte[] data;
-    int seg_num;
-    int seq_num;
-    int ack_num;
-    int ack_count;
-    int retrans_count;
-    boolean base;
-    boolean sent;
-    boolean acked;
-    boolean retrans;
-    long time_sent;
-    long time_acked;
+    protected int segNum;
+    protected int seqNum;
+    protected int ackNum;
+    protected int ackCount;
+    protected int retransCount;
+    protected boolean base;
+    protected boolean sent;
+    protected boolean acked;
+    protected boolean retrans;
+    protected long timeSent;
+    protected long timeAcked;
 
     /**
      * Constructs a new Segment.
      *
-     * @param seg_num: The segment number.
-     * @param seq_num: The associated packet sequence number.
+     * @param segNum : The segment number.
+     * @param seqNum : The associated packet sequence number.
      */
-    public Segment(int seg_num, int seq_num) {
-        this.seg_num = seg_num;
-        this.seq_num = seq_num;
-        time_sent = 0;
-        time_acked = 0;
-        retrans_count = 0;
+    public Segment(int segNum, int seqNum) {
+
+        this.segNum = segNum;
+        this.seqNum = seqNum;
+        timeSent = 0;
+        timeAcked = 0;
+        retransCount = 0;
         base = false;
         sent = false;
         acked = false;
         retrans = false;
     }
 
-    /**
-     * Sets the segment data.
-     * @param : The non-empty and non-null data.
-     */
-    public void set_data(byte[] data) {
+    public void setData(byte[] data) {
         this.data = data;
-        if (data != null && data.length != 0) {
-            ack_num = seq_num + data.length;
-        }
+        if (data != null && data.length != 0)
+            ackNum = seqNum + data.length;
     }
 
-    public byte[] get_data() {
+    public byte[] getData() {
         return data;
     }
 
     @Override
     public String toString() {
+
         return "\n{" +
-                "\n\tSeg#:        " + seg_num       +
-                "\n\tSeq#:        " + seq_num       +
+                "\n\tSeg#:        " + segNum +
+                "\n\tSeq#:        " + seqNum +
                 "\n\tData bytes:  " + data.length   +
                 "\n\tBase:        " + base          +
                 "\n\tSent:        " + sent          +
-                "\n\tTime sent:   " + time_sent     +
+                "\n\tTime sent:   " + timeSent +
                 "\n\tAcked:       " + acked         +
-                "\n\tAck#:        " + ack_num       +
-                "\n\tTime acked:  " + time_acked    +
-                "\n\tAck Count:   " + ack_count     +
+                "\n\tAck#:        " + ackNum +
+                "\n\tTime acked:  " + timeAcked +
+                "\n\tAck Count:   " + ackCount +
                 "\n\tRetrans:     " + retrans       +
-                "\n\tNum Retrans: " + retrans_count +
+                "\n\tNum Retrans: " + retransCount +
                 "\n}\n";
     }
 
-    /* Tester */
+    /** Tester */
     public static void main(String[] args) {
 
         ArrayList<Segment> list = new ArrayList<>();
