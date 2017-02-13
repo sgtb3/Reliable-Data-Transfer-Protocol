@@ -106,8 +106,6 @@ public abstract class RdtProtocol {
         else
             System.out.println(divider);
 
-        System.out.println("Total args passed: " + args.length);
-
         try {
             System.out.println(
                     "\tFile name:      "   + args[0] +
