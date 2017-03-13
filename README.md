@@ -49,12 +49,13 @@
 
 ##### Usage
 
-	make
-	java RdtReceiver <filename> <log_filename> <sender_IP> <sender_port>
-			      	  <listening_port> optional: <debug>
-	java RdtSender   <filename> <log_filename> <receiver_IP> <receiver_port>
-			      	  <listening_port> <window_size>
-			      	  optional: <debug>
+        make
+        java RdtReceiver <filename> <log_filename> <sender_IP> <sender_port>
+                         <listening_port> 
+                          optional: <debug>
+        java RdtSender   <filename> <log_filename> <receiver_IP> <receiver_port>
+                         <listening_port> <window_size>
+                          optional: <debug>
 			      	  
 - `sender_port` and `receiver_port` must be larger than well-known ports.
 - `window_size` size must be under 32768.
@@ -65,7 +66,3 @@
 	make
 	java RdtReceiver recv.jpg stdout localhost 10988 10989 debug
 	java RdtSender send.jpg sendLog.txt localhost 10989 10988 32767 debug
-
-##### Known Bugs
-* Currently, sender must set the debug flag in order for file transfer to 
-  work properly.
