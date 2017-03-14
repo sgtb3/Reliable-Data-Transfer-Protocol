@@ -48,7 +48,6 @@ public abstract class RdtProtocol {
 
     /**
      * Constructs a new protocol member.
-     *
      * @param args  : CL parameters.
      * @param debug : True - for debugging mode.
      *              : False - otherwise
@@ -170,14 +169,10 @@ public abstract class RdtProtocol {
         System.exit(0);
     }
 
-    /**
-     * Instantiates the ACK and Data Handler threads.
-     */
+    /** Instantiates the ACK and Data Handler threads. */
     abstract void instHandlers();
 
-    /**
-     * Starts the ACK and Data Handler threads.
-     */
+    /** Starts the ACK and Data Handler threads. */
     abstract void startHandlers();
 
     /**
@@ -192,14 +187,10 @@ public abstract class RdtProtocol {
      */
     abstract void disconnect();
 
-    /**
-     * Prints the file transfer statistics upon termination.
-     */
+    /** Prints the file transfer statistics upon termination. */
     abstract void printStats();
 
-    /**
-     * A hook that captures interrupt signals.
-     */
+    /** A hook that captures interrupt signals. */
     private void startShutdownHook() {
 
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -254,9 +245,7 @@ public abstract class RdtProtocol {
         });
     }
 
-    /**
-     * Instantiates the Timer.
-     */
+    /** Instantiates the Timer. */
     private void instTimer() {
         timer = new Timer(debugMode);
         timer.setName("Timer Thread");
@@ -265,7 +254,6 @@ public abstract class RdtProtocol {
 
     /**
      * Kills the program and displays error message to standard error.
-     *
      * @param msg : The message to be displayed before terminating.
      */
     protected void kill(String msg) {
@@ -275,7 +263,6 @@ public abstract class RdtProtocol {
 
     /**
      * Logs a time stamp and the message to standard out.
-     *
      * @param msg : The message to be displayed.
      */
     void println(String msg) {
@@ -285,9 +272,8 @@ public abstract class RdtProtocol {
 
     /**
      * Sends a datagram to the sender.
-     *
-     * @param buff : The TcpPacket encoded as a byte array
-     * @return     : True on success, false otherwise
+     * @param buff : The TcpPacket encoded as a byte array.
+     * @return     : True on success, false otherwise.
      */
     protected boolean sendPacket(byte[] buff) {
         try {
@@ -301,10 +287,9 @@ public abstract class RdtProtocol {
 
     /**
      * Attempts to receive incoming datagrams into the buffer.
-     *
      * @param buffSize : The size of the receive buffer.
-     * @return         : If not corrupt - the decoded TcpPacket object.
-     *                 : Null, otherwise.
+     * @return         : If not corrupt - the decoded TcpPacket object,
+     *                   Null, otherwise.
      */
     protected TcpPacket receivePacket(int buffSize) {
 
@@ -337,7 +322,6 @@ public abstract class RdtProtocol {
 
     /**
      * Returns a timestamp with millisecond accuracy.
-     *
      * @return : String formatted timestamp.
      */
     protected String getTimestamp() {
@@ -347,7 +331,6 @@ public abstract class RdtProtocol {
 
     /**
      * Logs the contents of the TcpPacket payload object to the logfile.
-     *
      * @param payload : The TcpPacket payload.
      */
     protected synchronized void log(TcpPacket payload) {
