@@ -17,7 +17,6 @@ public class Segment {
 
     /**
      * Constructs a new Segment.
-     *
      * @param segNum : The segment number.
      * @param seqNum : The associated packet sequence number.
      */
@@ -50,15 +49,15 @@ public class Segment {
         return "\n{" +
                 "\n\tSeg#:        " + segNum +
                 "\n\tSeq#:        " + seqNum +
-                "\n\tData bytes:  " + data.length   +
-                "\n\tBase:        " + base          +
-                "\n\tSent:        " + sent          +
+                "\n\tData bytes:  " + data.length +
+                "\n\tBase:        " + base +
+                "\n\tSent:        " + sent +
                 "\n\tTime sent:   " + timeSent +
-                "\n\tAcked:       " + acked         +
+                "\n\tAcked:       " + acked +
                 "\n\tAck#:        " + ackNum +
                 "\n\tTime acked:  " + timeAcked +
                 "\n\tAck Count:   " + ackCount +
-                "\n\tRetrans:     " + retrans       +
+                "\n\tRetrans:     " + retrans +
                 "\n\tNum Retrans: " + retransCount +
                 "\n}\n";
     }
