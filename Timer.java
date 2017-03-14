@@ -19,18 +19,17 @@ public class Timer extends Thread {
 
     /**
      * Constructs a new Timer object.
-     *
-     * @param debugMode : If true, will print debugging statements.
+     * @param debugMode : If true, print debugging statements.
      */
     public Timer(boolean debugMode) {
 
         this.debugMode = debugMode;
         timeoutEvent = false;
-        running         = false;
-        alive           = true;
-        timeout         =  1;
+        running = false;
+        alive = true;
+        timeout =  1;
         seqNum = -1;
-        startTime =  0;
+        startTime = 0;
         sampRtt =  1;
         estRtt =  1;
         devRtt =  1;
@@ -72,7 +71,6 @@ public class Timer extends Thread {
 
     /**
      * Starts the timer.
-     *
      * @param seqNum : The packet sequence number.
      */
     protected synchronized void startTimer(int seqNum) {
@@ -95,7 +93,6 @@ public class Timer extends Thread {
 
     /**
      * Stops the timer.
-     *
      * @param ackNum    : The acknowledgement number.
      * @param updateRtt : If set, this method will additionally update the
      *                    return-trip-time statistics.
@@ -122,7 +119,6 @@ public class Timer extends Thread {
 
     /**
      * Stops the timer.
-     *
      * @param ackNum : The acknowledgement number.
      */
     synchronized void stopTimer(int ackNum) {
@@ -131,7 +127,6 @@ public class Timer extends Thread {
 
     /**
      * Logs a timestamp and the message to the console.
-     *
      * @param msg : The message to be displayed.
      */
     private void println(String msg) {
