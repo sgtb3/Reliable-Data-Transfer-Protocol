@@ -18,7 +18,6 @@ public class RdtReceiver extends RdtProtocol {
 
     /**
      * Constructs a new Receiver.
-     * 
      * @param args  : The CL args.
      * @param debug : True - for debugging mode.
      *              : False - otherwise
@@ -167,7 +166,6 @@ public class RdtReceiver extends RdtProtocol {
          * Handles the dequeue portion. If more than one ACK is in the queue,
          * it chooses the one with the highest number and removes the
          * affected ACKs from the queue.
-         * 
          * @return : The next appropriate ACK to be sent.
          */
         private int dequeueAck() {
@@ -261,8 +259,7 @@ public class RdtReceiver extends RdtProtocol {
      * @param opt : 1 - create ACK packet.
      *            : 2 - create SYN/ACK packet.
      *            : 3 - create FIN/ACK packet.
-     *            : 4 - create FIN packet.
-     *            
+     *            : 4 - create FIN packet.       
      * @return    : TcpPacket encoded as an array of bytes.
      */
     private byte[] makePacket(int opt, int seq_num, int ack_num) {
@@ -441,7 +438,6 @@ public class RdtReceiver extends RdtProtocol {
 
     /**
      * The main entry point.
-     *
      * @param args: The CL args.
      */
     public static void main(String[] args) {
