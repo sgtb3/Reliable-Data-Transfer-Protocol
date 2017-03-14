@@ -17,7 +17,6 @@ public class RdtSender extends RdtProtocol {
 
     /**
      * Constructs a new Sender.
-     * 
      * @param args  : The CL args.
      * @param debug : True - for debugging mode.
      *              : False - otherwise
@@ -164,7 +163,6 @@ public class RdtSender extends RdtProtocol {
 
         /**
          * Simulates the TCP fast retransmit mechanism.
-         * 
          * @param currAck : The ACK num to be retransmitted.
          */
         private void fastRetransmit(int currAck) {
@@ -352,8 +350,7 @@ public class RdtSender extends RdtProtocol {
      *            : 4 - Create FIN packet with data.
      *            : 5 - Create FIN packet without data.
      *            : 6 - Create FIN/ACK packet.
-     *            : 7 - Create RST packet.
-     *            
+     *            : 7 - Create RST packet. 
      * @return    : TcpPacket encoded as a byte array.
      */
     private byte[] makePacket(int opt, int seqNum, int ackNum, byte[] data) {
@@ -399,8 +396,7 @@ public class RdtSender extends RdtProtocol {
      * @param opt : 1 - Sent segments.
      *            : 2 - Acked segments.
      *            : 3 - Retransmitted segments.
-     *            : 4 - Base segments
-     *            
+     *            : 4 - Base segments.
      * @return : A new ArrayList consisting of the sequence numbers.
      */
     private ArrayList<Integer> getSeqNumbers(int opt) {
@@ -421,9 +417,8 @@ public class RdtSender extends RdtProtocol {
     /**
      * Searches the segment map for a segment.
      * @param num     : The corresponding sequence or ACK number.
-     * @param opt     : 1 - search by seqNum
-     *                : 2 - search by ackNum
-     *                
+     * @param opt     : 1 - search by seqNum.
+     *                : 2 - search by ackNum.
      * @return        : The Segment contained in the map, if it exists.
      *                : Null, otherwise.
      */
@@ -616,7 +611,6 @@ public class RdtSender extends RdtProtocol {
 
     /**
      * The main entry point.
-     * 
      * @param args: The CL args.
      */
     public static void main(String[] args) {
