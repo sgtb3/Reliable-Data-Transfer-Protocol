@@ -47,7 +47,6 @@ public class TcpPacket {
 
     /**
      * Constructs a new TcpPacket object given the packet fields.
-     *
      * @param srcPort  : The source port.
      * @param destPort : The destination port.
      * @param seqNum   : The packet sequence number.
@@ -95,9 +94,7 @@ public class TcpPacket {
 
     /**
      * Updates the header field.
-     *
      * @param value : options + options padding.
-     *
      * @throws Exception : If segment len exceeds 60 bytes.
      */
     private void updateHeader(int value) throws Exception {
@@ -110,9 +107,7 @@ public class TcpPacket {
 
     /**
      * Creates a packet using pre-filled class fields.
-     *
-     * @return The byte[] segment.
-     *
+     * @return : The byte[] segment.
      * @throws Exception : If unable to encode TcpPacket.
      */
     public byte[] encode() throws Exception {
@@ -208,9 +203,7 @@ public class TcpPacket {
 
     /**
      * Extract TcpPacket fields from array p.
-     *
      * @param p : A byte array containing an encoded TcpPacket.
-     *
      * @throws IllegalArgumentException : If segment length exceeds 60 bytes.
      * @throws Exception : If buffer p is not large enough to hold min header.
      */
@@ -304,10 +297,8 @@ public class TcpPacket {
 
     /**
      * Converts an array of four bytes into an integer.
-     *
      * @param bytes : The bytes to be converted to an integer.
-     *
-     * @return The equivalent integer value.
+     * @return : The equivalent integer value.
      */
     public int bytesToInt(byte[] bytes) {
 
@@ -322,10 +313,8 @@ public class TcpPacket {
 
     /**
      * Converts an array of two bytes into a short.
-     *
      * @param bytes : The bytes to be converted to a short value.
-     *
-     * @return The equivalent short value.
+     * @return : The equivalent short value.
      */
     public short bytesToShort(byte[] bytes) {
 
@@ -338,10 +327,8 @@ public class TcpPacket {
 
     /**
      * Converts an array of four bytes into an integer.
-     *
      * @param num : The integer to be converted.
-     *
-     * @return An array of four bytes containing the integer value.
+     * @return : An array of four bytes containing the integer value.
      */
     public byte[] intToBytes(int num) {
         return ByteBuffer.allocate(4).
@@ -350,10 +337,8 @@ public class TcpPacket {
 
     /**
      * Converts a short to an array of two bytes.
-     *
      * @param value : The short value.
-     *
-     * @return An array of two bytes containing the short value.
+     * @return : An array of two bytes containing the short value.
      */
     public byte[] shortToBytes(short value) {
         return ByteBuffer.allocate(2).
@@ -362,10 +347,8 @@ public class TcpPacket {
 
     /**
      * Calculates the 16-bit 1's complement checksum.
-     *
      * @param bytes : The bytes to be checksumed.
-     *
-     * @return The checksum value.
+     * @return : The checksum value.
      */
     public short calculateChecksum(byte[] bytes) {
 
@@ -386,8 +369,7 @@ public class TcpPacket {
 
     /**
      * Converts the TCP flags into a byte.
-     *
-     * @return The one-byte array containing the TCP flag values.
+     * @return : The one-byte array containing the TCP flag values.
      */
     private byte[] flagsToByte() {
 
